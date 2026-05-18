@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proxy</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #0d0d0d; color: #eee; min-height: 100vh; }
+  header { padding: 1rem 1.5rem; display: flex; gap: 10px; align-items: center; background: #111; border-bottom: 1px solid #222; }
+  header input {
+    flex: 1; padding: 8px 14px; border-radius: 8px; border: 1px solid #333;
+    background: #1a1a1a; color: #eee; font-size: 14px; font-family: monospace; outline: none;
+  }
+  header input:focus { border-color: #555; }
+  header button {
+    padding: 8px 18px; border-radius: 8px; border: none; background: #333;
+    color: #eee; cursor: pointer; font-size: 14px;
+  }
+  header button:hover { background: #444; }
+  #status { font-size: 12px; color: #666; padding: 0.5rem 1.5rem; background: #0d0d0d; font-family: monospace; }
+  iframe { width: 100%; height: calc(100vh - 90px); border: none; display: block; background: #fff; }
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: calc(100vh - 90px); gap: 1rem; color: #444; }
+  .empty h1 { font-size: 2rem; font-weight: 300; color: #666; }
+  .empty p { font-size: 13px; color: #444; font-family: monospace; }
+  .quick { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 0.5rem; }
+  .quick button { font-size: 12px; padding: 4px 12px; border-radius: 99px;
+    border: 1px solid #333; background: transparent; color: #666; cursor: pointer; font-family: monospace; }
+  .quick button:hover { border-color: #555; color: #999; }
+</style>
+</head>
+<body>
+<header>
+  <input id="url" type="text" placeholder="https://example.com" autocomplete="off" spellcheck="false" />
+  <button onclick="go()">Go</button>
+  <button onclick="clear_()">✕</button>
+</header>
+<div id="status">ready</div>
+
+<div id="empty" class="empty">
+  <h1>proxy</h1>
+  <p>enter any URL above to browse through the proxy</p>
+  <div class="quick">
+    <button onclick="load('https://wikipedia.org')">wikipedia</button>
+    <button onclick="load('https://reddit.com')">reddit</button>
+    <button onclick="load('https://news.ycombinator.com')">hacker news</button>
+    <button onclick="load('https://github.com')">github</button>
+  </div>
+</div>
+<iframe id="frame" style="display:none;"></iframe>
+
+<script>
+  // ⚠️ CHANGE THIS to your Cloudflare Worker URL after deploying worker.js
+  const WORKER = 'https://YOUR-WORKER.YOUR-USERNAME.workers.dev';
+
+  function proxyUrl(target) {
+    return WORKER + '/?url=' + encodeURIComponent(target);
+  }
+
+  function normalise(raw) {
+    raw = raw.trim();
+    if (!raw.startsWith('http')) raw = 'https://' + raw;
+    return raw;
+  }
+
+  function go() {
+    const raw = document.getElementById('url').value;
+    if (!raw) return;
+    load(normalise(raw));
+  }
+
+  function load(url) {
+    document.getElementById('url').value = url;
+    document.getElementById('status').textContent = 'loading ' + url + ' ...';
+    document.getElementById('empty').style.display = 'none';
+    const frame = document.getElementById('frame');
+    frame.style.display = 'block';
+    frame.src = proxyUrl(url);
+    frame.onload = () => {
+      document.getElementById('status').textContent = '✓ loaded: ' + url;
+    };
+    frame.onerror = () => {
+      document.getElementById('status').textContent = '✗ failed to load: ' + url;
+    };
+  }
+
+  function clear_() {
+    document.getElementById('frame').style.display = 'none';
+    document.getElementById('frame').src = '';
+    document.getElementById('empty').style.display = 'flex';
+    document.getElementById('url').value = '';
+    document.getElementById('status').textContent = 'ready';
+  }
+
+  document.getElementById('url').addEventListener('keydown', e => {
+    if (e.key === 'Enter') go();
+  });
+</script>
+</body>
+</html>

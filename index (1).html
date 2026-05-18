@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Proxy (No Backend)</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; background: #f5f5f0; min-height: 100vh; }
+  header { padding: 1rem 1.5rem; display: flex; gap: 10px; align-items: center;
+    background: #fff; border-bottom: 1px solid #e5e5e5; }
+  header input { flex: 1; padding: 8px 14px; border-radius: 8px; border: 1px solid #ddd;
+    font-size: 14px; font-family: monospace; outline: none; }
+  header input:focus { border-color: #aaa; }
+  header button { padding: 8px 18px; border-radius: 8px; border: 1px solid #ddd;
+    background: #fff; cursor: pointer; font-size: 14px; }
+  header button:hover { background: #f5f5f5; }
+  #status { font-size: 12px; color: #999; padding: 6px 1.5rem; background: #fff;
+    border-bottom: 1px solid #eee; font-family: monospace; }
+  #relay-bar { padding: 6px 1.5rem; background: #fff; border-bottom: 1px solid #eee;
+    font-size: 12px; color: #888; display: flex; gap: 1rem; align-items: center; }
+  #relay-bar label { color: #555; }
+  #relay-bar select { font-size: 12px; border: 1px solid #ddd; border-radius: 4px; padding: 2px 6px; }
+  iframe { width: 100%; height: calc(100vh - 104px); border: none; display: block; background: #fff; }
+  .empty { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: calc(100vh - 104px); gap: 1rem; color: #aaa; }
+  .empty h1 { font-size: 1.8rem; font-weight: 300; }
+  .note { font-size: 11px; color: #bbb; max-width: 380px; text-align: center; line-height: 1.6; }
+  .quick { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .quick button { font-size: 12px; padding: 4px 12px; border-radius: 99px;
+    border: 1px solid #ddd; background: transparent; color: #888; cursor: pointer; font-family: monospace; }
+  .quick button:hover { border-color: #aaa; color: #555; }
+</style>
+</head>
+<body>
+<header>
+  <input id="url" type="text" placeholder="https://example.com" autocomplete="off" spellcheck="false" />
+  <button onclick="go()">Go</button>
+  <button onclick="clear_()">✕</button>
+</header>
+<div id="relay-bar">
+  <label>relay:</label>
+  <select id="relay" onchange="go()">
+    <option value="allorigins">allorigins.win</option>
+    <option value="corsproxy">corsproxy.io</option>
+    <option value="codetabs">codetabs.com</option>
+  </select>
+  <span id="status">ready</span>
+</div>
+
+<div id="empty" class="empty">
+  <h1>proxy</h1>
+  <p class="note">no backend required — uses public CORS relays. works on many sites, fails on some.</p>
+  <div class="quick">
+    <button onclick="load('https://wikipedia.org')">wikipedia</button>
+    <button onclick="load('https://news.ycombinator.com')">hacker news</button>
+    <button onclick="load('https://example.com')">example.com</button>
+  </div>
+</div>
+<iframe id="frame" style="display:none;"></iframe>
+
+<script>
+  const relays = {
+    allorigins: url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    corsproxy: url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    codetabs: url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  };
+
+  function go() {
+    let raw = document.getElementById('url').value.trim();
+    if (!raw) return;
+    if (!raw.startsWith('http')) raw = 'https://' + raw;
+    load(raw);
+  }
+
+  async function load(url) {
+    document.getElementById('url').value = url;
+    document.getElementById('status').textContent = 'fetching...';
+    document.getElementById('empty').style.display = 'none';
+
+    const relay = document.getElementById('relay').value;
+    const proxyUrl = relays[relay](url);
+
+    try {
+      const res = await fetch(proxyUrl);
+      if (!res.ok) throw new Error('relay returned ' + res.status);
+      let html = await res.text();
+
+      // inject base tag
+      const base = new URL(url);
+      html = html.replace(/(<head[^>]*>)/i, `$1<base href="${base.origin}/">`);
+
+      const frame = document.getElementById('frame');
+      frame.style.display = 'block';
+      frame.srcdoc = html;
+      frame.onload = () => document.getElementById('status').textContent = '✓ ' + url;
+      document.getElementById('status').textContent = 'rendering...';
+    } catch(e) {
+      document.getElementById('status').textContent = '✗ ' + e.message + ' — try a different relay';
+    }
+  }
+
+  function clear_() {
+    document.getElementById('frame').style.display = 'none';
+    document.getElementById('frame').srcdoc = '';
+    document.getElementById('empty').style.display = 'flex';
+    document.getElementById('url').value = '';
+    document.getElementById('status').textContent = 'ready';
+  }
+
+  document.getElementById('url').addEventListener('keydown', e => {
+    if (e.key === 'Enter') go();
+  });
+</script>
+</body>
+</html>
